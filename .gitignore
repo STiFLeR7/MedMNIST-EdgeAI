@@ -1,0 +1,27 @@
+# Ignore data directory (large datasets)
+data/
+
+# Ignore models directory (model checkpoints, saved models)
+models/
+
+# Ignore wandb logs and directories
+wandb/
+
+# Ignore Python bytecode
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore virtual environment directories
+venv/
+env/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore setup.py if you don't want it to be tracked (if it's for local use only)
+setup.py
