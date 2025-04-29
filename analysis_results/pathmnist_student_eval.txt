@@ -1,0 +1,9 @@
+
+🧪 PATHMNIST Validation Accuracy: 95.95%
+💾 Saved model: mobilenetv3_pathmnist.pth
+
+🧪 PATHMNIST Validation Accuracy: 97.31%
+💾 Saved model: shufflenet_pathmnist.pth
+
+🧪 PATHMNIST Validation Accuracy: 97.43%
+💾 Saved model: tinycnn_pathmnist.pth

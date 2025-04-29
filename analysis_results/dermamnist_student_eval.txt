@@ -1,0 +1,9 @@
+
+🧪 DERMAMNIST Validation Accuracy: 75.87%
+💾 Saved model: mobilenetv3_dermamnist.pth
+
+🧪 DERMAMNIST Validation Accuracy: 75.27%
+💾 Saved model: shufflenet_dermamnist.pth
+
+🧪 DERMAMNIST Validation Accuracy: 77.77%
+💾 Saved model: tinycnn_dermamnist.pth
