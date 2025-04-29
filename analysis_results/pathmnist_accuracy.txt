@@ -1,0 +1,1 @@
+Validation Accuracy on PATHMNIST: 16.66%

@@ -1,0 +1,1 @@
+Validation Accuracy on DERMAMNIST: 76.77%
