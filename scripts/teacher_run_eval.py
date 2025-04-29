@@ -9,11 +9,14 @@ import medmnist
 from tqdm import tqdm
 import wandb
 from torch.optim.lr_scheduler import StepLR
+import json
 
 # -------- CONFIG -------- #
-DATASETS = ['pathmnist', 'dermamnist']
-SAVE_MODEL_PATH = 'models/efficientnet_b3_teacher.pth'
-RESULTS_DIR = 'analysis_results'
+SAVE_DIR = 'models/'
+ANALYSIS_DIR = 'analysis_results/'
+os.makedirs(SAVE_DIR, exist_ok=True)
+os.makedirs(ANALYSIS_DIR, exist_ok=True)
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 BATCH_SIZE = 32
@@ -21,9 +24,6 @@ NUM_EPOCHS = 50
 LEARNING_RATE = 1e-3
 LR_STEP_SIZE = 10
 GAMMA = 0.7
-
-# -------- SETUP DIR -------- #
-os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # -------- TRANSFORMS -------- #
 transform = transforms.Compose([
@@ -35,13 +35,13 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
-# -------- INIT MODEL -------- #
-def create_efficientnet_b3():
+# -------- FUNCTIONS -------- #
+
+def create_efficientnet_b3(n_classes):
     model = models.efficientnet_b3(weights='IMAGENET1K_V1')
-    model.classifier[1] = nn.Identity()
+    model.classifier[1] = nn.Linear(model.classifier[1].in_features, n_classes).to(DEVICE)
     return model.to(DEVICE)
 
-# -------- DATA LOADER -------- #
 def get_loader(dataset_name):
     info = INFO[dataset_name]
     n_classes = len(info['label'])
@@ -54,14 +54,27 @@ def get_loader(dataset_name):
     val_loader = DataLoader(dataset=val_set, batch_size=BATCH_SIZE, shuffle=False)
     return train_loader, val_loader, n_classes
 
-# -------- TRAIN -------- #
-def train(model, fc_layer, train_loader, criterion, optimizer, scheduler, dataset_name):
-    model.train()
-    model.classifier[1] = fc_layer
+def train_and_eval(dataset_name):
+    # W&B session
+    wandb.init(project="medmnist-multitask", name=f"efficientnet_b3_{dataset_name}", config={
+        "dataset": dataset_name,
+        "epochs": NUM_EPOCHS,
+        "lr": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "architecture": "EfficientNet-B3"
+    })
+
+    print(f"\n🔵 Starting training on {dataset_name.upper()}...")
+    train_loader, val_loader, n_classes = get_loader(dataset_name)
+    model = create_efficientnet_b3(n_classes)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss()
+    scheduler = StepLR(optimizer, step_size=LR_STEP_SIZE, gamma=GAMMA)
 
     for epoch in range(NUM_EPOCHS):
-        running_loss = 0.0
-        correct, total = 0, 0
+        model.train()
+        running_loss, correct, total = 0.0, 0, 0
 
         for images, targets in tqdm(train_loader, desc=f"[{dataset_name.upper()}] Epoch [{epoch+1}/{NUM_EPOCHS}]"):
             images, targets = images.to(DEVICE), targets.squeeze().long().to(DEVICE)
@@ -79,15 +92,22 @@ def train(model, fc_layer, train_loader, criterion, optimizer, scheduler, datase
             correct += (predicted == targets).sum().item()
 
         acc = 100 * correct / total
-        wandb.log({f"{dataset_name}/loss": running_loss, f"{dataset_name}/train_acc": acc, "epoch": epoch+1})
+        wandb.log({f"{dataset_name}/train_loss": running_loss, f"{dataset_name}/train_acc": acc, "epoch": epoch+1})
         print(f"📘 Epoch {epoch+1}, Loss: {running_loss:.4f}, Train Acc: {acc:.2f}%")
 
         scheduler.step()
 
-# -------- EVALUATE -------- #
-def evaluate(model, fc_layer, val_loader, dataset_name):
+    # Save model
+    save_path = os.path.join(SAVE_DIR, f"efficientnet_b3_teacher_{dataset_name}.pth")
+    torch.save(model.state_dict(), save_path)
+    print(f"✅ Saved model at {save_path}")
+
+    # Evaluation
+    eval_acc = evaluate(model, val_loader, dataset_name)
+    return eval_acc
+
+def evaluate(model, val_loader, dataset_name):
     model.eval()
-    model.classifier[1] = fc_layer
     correct, total = 0, 0
 
     with torch.no_grad():
@@ -102,51 +122,30 @@ def evaluate(model, fc_layer, val_loader, dataset_name):
     wandb.log({f"{dataset_name}/val_acc": acc})
     print(f"🧪 {dataset_name.upper()} Validation Accuracy: {acc:.2f}%")
 
-    # Save to file
-    result_file = os.path.join(RESULTS_DIR, f"{dataset_name}_accuracy.txt")
-    with open(result_file, 'w') as f:
-        f.write(f"Validation Accuracy on {dataset_name.upper()}: {acc:.2f}%\n")
+    # Save result
+    result = {
+        "dataset": dataset_name,
+        "validation_accuracy": acc
+    }
+    with open(os.path.join(ANALYSIS_DIR, f"{dataset_name}_result.json"), 'w') as f:
+        json.dump(result, f, indent=4)
+
+    return acc
 
 # -------- MAIN -------- #
+
 if __name__ == "__main__":
     wandb.login()
-    wandb.init(project="medmnist-multitask", name="efficientnet_b3_teacher", config={
-        "epochs": NUM_EPOCHS,
-        "lr": LEARNING_RATE,
-        "batch_size": BATCH_SIZE,
-        "architecture": "EfficientNet-B3"
-    })
 
-    model = create_efficientnet_b3()
-    fc_dict = {}
+    datasets = ['pathmnist', 'dermamnist']
+    summary = {}
 
-    for dataset_name in DATASETS:
-        print(f"\n🔁 Training on {dataset_name.upper()}...")
-        train_loader, val_loader, n_classes = get_loader(dataset_name)
+    for dataset_name in datasets:
+        acc = train_and_eval(dataset_name)
+        summary[dataset_name] = acc
+        wandb.finish()
 
-        fc_layer = nn.Linear(1536, n_classes).to(DEVICE)
-        fc_dict[dataset_name] = fc_layer
+    print("\n📊 Final Summary:")
+    for k, v in summary.items():
+        print(f"{k.upper()} Validation Accuracy: {v:.2f}%")
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-        criterion = nn.CrossEntropyLoss()
-        scheduler = StepLR(optimizer, step_size=LR_STEP_SIZE, gamma=GAMMA)
-
-        train(model, fc_layer, train_loader, criterion, optimizer, scheduler, dataset_name)
-
-    # Save model backbone + FCs
-    model.classifier[1] = nn.Identity()
-    torch.save({
-        'backbone': model.state_dict(),
-        'fc_layers': {k: v.state_dict() for k, v in fc_dict.items()}
-    }, SAVE_MODEL_PATH)
-    print(f"\n✅ Final model saved to: {SAVE_MODEL_PATH}")
-
-    # -------- POST-TRAINING EVALUATION -------- #
-    print("\n🔍 Running Evaluation on all datasets...\n")
-    for dataset_name in DATASETS:
-        _, val_loader, n_classes = get_loader(dataset_name)
-        fc_layer = nn.Linear(1536, n_classes).to(DEVICE)
-        fc_layer.load_state_dict(fc_dict[dataset_name].state_dict())
-        evaluate(model, fc_layer, val_loader, dataset_name)
-
-    wandb.finish()
