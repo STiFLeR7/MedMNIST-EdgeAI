@@ -18,8 +18,8 @@ DATASETS = ['pathmnist', 'dermamnist']
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 SAVE_DIR = 'models/student_models/'
 TEACHER_PATHS = {
-    'pathmnist': 'models/teacher_models/efficientnet_b3_teacher_pathmnist.pth',
-    'dermamnist': 'models/teacher_models/efficientnet_b3_teacher_dermamnist.pth'
+    'pathmnist': 'models/efficientnet_b3_teacher_pathmnist.pth',
+    'dermamnist': 'models/efficientnet_b3_teacher_dermamnist.pth'
 }
 os.makedirs(SAVE_DIR, exist_ok=True)
 
