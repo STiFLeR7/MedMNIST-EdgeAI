@@ -1,129 +1,163 @@
+# scripts/student_qat_run_eval.py
 
+import os
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.ao.quantization import get_default_qat_qconfig, prepare_qat_fx, convert_fx
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchvision import transforms
+import torchvision.models as models
+import torchvision.transforms as transforms
+from medmnist import INFO
+import medmnist
 from tqdm import tqdm
-import os
-import torch.backends.cudnn as cudnn
 
-from models.student_models import get_student_model
-from models.teacher_model import get_teacher_model
-from medmnist import INFO, Evaluator
-from medmnist.dataset import PathMNIST, DermaMNIST
+# ─── ensure quant backend ─────────────────────────────────────────────────────────
+torch.backends.quantized.engine = 'fbgemm'
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-BATCH_SIZE = 128
-NUM_EPOCHS = 10
-FINETUNE_EPOCHS = 3
-DATA_PATH = "./data"
+# ─── CONFIG ───────────────────────────────────────────────────────────────────────
+DATASETS      = ['pathmnist', 'dermamnist']
+DEVICE        = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+STUDENT_DIR   = 'models/student_models'
+TEACHER_CKPTS = {
+    'pathmnist': 'models/efficientnet_b3_teacher_pathmnist.pth',
+    'dermamnist': 'models/efficientnet_b3_teacher_dermamnist.pth'
+}
+BATCH_SIZE    = 32
+NUM_QAT_EPOCHS= 5    # fewer QAT epochs
+NUM_FT_EPOCHS = 3    # finetune after quantize
+LR            = 1e-4
 
-def get_dataset(name):
-    info = INFO[name]
-    DataClass = eval(info['python_class'])
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[.5], std=[.5])])
-    train_dataset = DataClass(split='train', transform=transform, download=True, root=DATA_PATH)
-    val_dataset = DataClass(split='val', transform=transform, download=True, root=DATA_PATH)
-    return train_dataset, val_dataset, info['n_classes']
+# ─── TRANSFORMS ───────────────────────────────────────────────────────────────────
+transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(10),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
+])
 
-def load_model(path, model):
-    state_dict = torch.load(path, map_location=DEVICE)
-    model.load_state_dict(state_dict)
-    return model
+# ─── STUDENT FACTORY ────────────────────────────────────────────────────────────────
+def get_student_model(name, ncls):
+    if name=='mobilenetv3':
+        m = models.mobilenet_v3_small(weights=None)
+        m.classifier[3] = nn.Linear(m.classifier[3].in_features, ncls)
+    elif name=='shufflenet':
+        m = models.shufflenet_v2_x1_0(weights=None)
+        m.fc = nn.Linear(m.fc.in_features, ncls)
+    elif name=='tinycnn':
+        class TinyCNN(nn.Module):
+            def __init__(self, c): 
+                super().__init__()
+                self.conv = nn.Sequential(
+                    nn.Conv2d(3,32,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                    nn.Conv2d(32,64,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                    nn.Conv2d(64,128,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1)
+                )
+                self.fc = nn.Linear(128, c)
+            def forward(self,x):
+                x = self.conv(x).view(x.size(0),-1)
+                return self.fc(x)
+        m = TinyCNN(ncls)
+    else:
+        raise ValueError(name)
+    return m.to(DEVICE)
 
-def train_one_epoch(model, teacher, loader, optimizer, criterion, epoch, is_qat=False):
-    model.train()
-    total_loss, correct, total = 0, 0, 0
-    for inputs, targets in tqdm(loader, desc=f"[Ep{epoch+1}] QAT:{is_qat}", leave=False):
-        inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        if teacher:
-            with torch.no_grad():
-                teacher_outputs = teacher(inputs)
-            loss = criterion(outputs, teacher_outputs)
-        else:
-            loss = nn.CrossEntropyLoss()(outputs, targets)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item() * inputs.size(0)
-        _, predicted = outputs.max(1)
-        correct += predicted.eq(targets).sum().item()
-        total += targets.size(0)
-    return total_loss / total, 100. * correct / total
+# ─── DATA LOADER ───────────────────────────────────────────────────────────────────
+def get_loader(ds):
+    info = INFO[ds]
+    cls = getattr(medmnist, info['python_class'])
+    tr = cls(split='train', root='data', transform=transform, download=True)
+    vl = cls(split='val',   root='data', transform=transform, download=True)
+    return (DataLoader(tr, BATCH_SIZE, True),
+            DataLoader(vl, BATCH_SIZE, False),
+            len(info['label']))
 
-def evaluate(model, loader):
+# ─── LOAD TEACHER ─────────────────────────────────────────────────────────────────
+def load_teacher(ds, ncls):
+    ck = torch.load(TEACHER_CKPTS[ds], map_location=DEVICE)
+    t = models.efficientnet_b3(weights=None)
+    t.classifier[1] = nn.Linear(t.classifier[1].in_features, ncls)
+    t.load_state_dict(ck['backbone'], strict=False)
+    return t.eval().to(DEVICE)
+
+# ─── DISTILL LOSS ──────────────────────────────────────────────────────────────────
+def distill_loss(s_log, t_log, y, T=4., α=0.5):
+    kd = F.kl_div(
+        F.log_softmax(s_log/T,1),
+        F.softmax(t_log/T,1),
+        reduction='batchmean'
+    ) * (T*T)
+    ce = F.cross_entropy(s_log, y)
+    return α*kd + (1-α)*ce
+
+# ─── QAT + DISTILL TRAIN ───────────────────────────────────────────────────────────
+def run_qat(student, teacher, tr_ld, ds_name):
+    # load pretrained student fp32 weights
+    fp32_path = os.path.join(STUDENT_DIR, f"{student_name}_{ds_name}.pth")
+    student.load_state_dict(torch.load(fp32_path, map_location=DEVICE), strict=False)
+
+    # prepare QAT
+    student.train()
+    student.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+    torch.quantization.prepare_qat(student, inplace=True)
+
+    opt = torch.optim.Adam(student.parameters(), lr=LR)
+
+    # QAT epochs
+    for ep in range(NUM_QAT_EPOCHS):
+        running, corr, tot = 0.,0,0
+        for x,y in tqdm(tr_ld, desc=f"[{student_name}][{ds_name}] QAT Ep{ep+1}"):
+            x,y = x.to(DEVICE), y.squeeze().long().to(DEVICE)
+            with torch.no_grad(): t_log = teacher(x)
+            s_log = student(x)
+            loss = distill_loss(s_log, t_log, y)
+            opt.zero_grad(); loss.backward(); opt.step()
+            running += loss.item()
+            corr   += (s_log.argmax(1)==y).sum().item(); tot += y.size(0)
+        print(f" → Ep{ep+1} Loss {running:.3f} Acc {100*corr/tot:.2f}%")
+
+    # convert to int8
+    student.cpu()
+    torch.quantization.convert(student.eval(), inplace=True)
+
+    # small finetune on CPU int8
+    student.train()
+    opt = torch.optim.Adam(student.parameters(), lr=LR/10)
+    for ep in range(NUM_FT_EPOCHS):
+        corr, tot = 0,0
+        for x,y in tr_ld:
+            x,y = x.cpu(), y.squeeze().long().cpu()
+            out = student(x)
+            loss = F.cross_entropy(out, y)
+            opt.zero_grad(); loss.backward(); opt.step()
+            corr += (out.argmax(1)==y).sum().item(); tot += y.size(0)
+        print(f"  FT Ep{ep+1} Acc {100*corr/tot:.2f}%")
+
+    save_path = os.path.join(STUDENT_DIR, f"{student_name}_{ds_name}_qat.pth")
+    torch.save(student.state_dict(), save_path)
+    print("✅ Saved QAT:", save_path)
+    return student
+
+# ─── EVAL ───────────────────────────────────────────────────────────────────────────
+def evaluate(model, vl, ds_name):
     model.eval()
-    correct, total = 0, 0
+    corr, tot = 0,0
     with torch.no_grad():
-        for inputs, targets in loader:
-            inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-            outputs = model(inputs)
-            _, predicted = outputs.max(1)
-            correct += predicted.eq(targets).sum().item()
-            total += targets.size(0)
-    return 100. * correct / total
+        for x,y in vl:
+            x,y = x.cpu(), y.squeeze().long().cpu()
+            corr += (model(x).argmax(1)==y).sum().item(); tot += y.size(0)
+    acc = 100*corr/tot
+    print(f"🧪 [{student_name}][{ds_name}] QAT Val Acc: {acc:.2f}%")
+    with open(f"analysis_results/{student_name}_{ds_name}_qat.txt","w") as f:
+        f.write(f"{acc:.2f}%\n")
 
-def train_qat(student, teacher, train_loader, val_loader):
-    student.to(DEVICE)
-    teacher.to(DEVICE) if teacher else None
-
-    # QAT Config
-    qconfig = get_default_qat_qconfig("fbgemm")
-    qconfig_dict = {"": qconfig}
-    example_inputs = torch.randn(1, 3, 28, 28).to(DEVICE)
-
-    # Skip quantization for grouped convolutions by excluding them
-    student.eval()
-    student_prepared = prepare_qat_fx(student, qconfig_dict, example_inputs)
-    student_prepared.train()
-
-    # Optimizer
-    optimizer = optim.Adam(student_prepared.parameters(), lr=1e-4)
-    criterion = nn.MSELoss() if teacher else nn.CrossEntropyLoss()
-
-    # QAT Training
-    for epoch in range(NUM_EPOCHS):
-        loss, acc = train_one_epoch(student_prepared, teacher, train_loader, optimizer, criterion, epoch, is_qat=True)
-        print(f" → Ep{epoch+1} Loss: {loss:.4f} Acc: {acc:.2f}%")
-
-    # Convert to quantized model
-    student_int8 = convert_fx(student_prepared.eval())
-
-    # Finetuning phase
-    print("🔧 Finetuning quantized model...")
-    student_int8.to(DEVICE)
-    optimizer = optim.Adam(student_int8.parameters(), lr=1e-5)
-    for epoch in range(FINETUNE_EPOCHS):
-        loss, acc = train_one_epoch(student_int8, None, train_loader, optimizer, None, epoch, is_qat=False)
-        print(f" [Finetune] Ep{epoch+1} Acc: {acc:.2f}%")
-
-    final_acc = evaluate(student_int8, val_loader)
-    return final_acc
-
-if __name__ == "__main__":
-    settings = [
-        ("mobilenetv3", "pathmnist"),
-        ("mobilenetv3", "dermamnist"),
-        ("shufflenet", "pathmnist"),
-        ("shufflenet", "dermamnist"),
-        ("tinycnn", "pathmnist"),
-        ("tinycnn", "dermamnist"),
-    ]
-
-    for student_name, ds in settings:
-        print(f"🔥 QAT+static {student_name} on {ds}")
-        train_ds, val_ds, num_classes = get_dataset(ds)
-        train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-        val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False)
-
-        student_path = f"models/student_models/{student_name}_{ds}.pth"
-        teacher_path = "models/teacher_models/efficientnet_b3_teacher.pth"
-
-        student = load_model(student_path, get_student_model(student_name, num_classes))
-        teacher = load_model(teacher_path, get_teacher_model(num_classes))
-
-        acc = train_qat(student, teacher, train_loader, val_loader)
-        print(f"✅ {student_name} on {ds} QAT+Finetune Acc: {acc:.2f}%\n")
+# ─── MAIN ───────────────────────────────────────────────────────────────────────────
+if __name__=='__main__':
+    os.makedirs('analysis_results', exist_ok=True)
+    for student_name in ['mobilenetv3','shufflenet','tinycnn']:
+      for ds_name in DATASETS:
+        print(f"\n🔥 {student_name} on {ds_name} (QAT+Distill+FT)")
+        tr_ld, vl, ncls = get_loader(ds_name)
+        student = get_student_model(student_name, ncls)
+        teacher = load_teacher(ds_name, ncls)
+        student = run_qat(student, teacher, tr_ld, ds_name)
+        evaluate(student, vl, ds_name)
