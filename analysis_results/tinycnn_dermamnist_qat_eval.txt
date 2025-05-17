@@ -1,0 +1,1 @@
+tinycnn on dermamnist QAT Acc: 76.47%

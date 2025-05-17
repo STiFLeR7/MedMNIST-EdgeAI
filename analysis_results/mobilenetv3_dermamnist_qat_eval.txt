@@ -1,0 +1,1 @@
+mobilenetv3 on dermamnist QAT Acc: 78.86%

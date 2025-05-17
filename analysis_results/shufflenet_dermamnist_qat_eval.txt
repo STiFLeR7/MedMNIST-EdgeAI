@@ -1,0 +1,1 @@
+shufflenet on dermamnist QAT Acc: 76.87%
