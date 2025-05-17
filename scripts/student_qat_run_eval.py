@@ -74,9 +74,23 @@ def get_loader(ds):
 # ─── LOAD TEACHER ─────────────────────────────────────────────────────────────────
 def load_teacher(ds, ncls):
     ck = torch.load(TEACHER_CKPTS[ds], map_location=DEVICE)
+    # instantiate fresh EfficientNet-B3
     t = models.efficientnet_b3(weights=None)
+    # replace its classifier with the right output size
     t.classifier[1] = nn.Linear(t.classifier[1].in_features, ncls)
-    t.load_state_dict(ck['backbone'], strict=False)
+
+    # now load weights:
+    if isinstance(ck, dict) and 'backbone' in ck:
+        # our checkpoint format: {'backbone':..., 'fc_layers':{...}}
+        t.load_state_dict(ck['backbone'], strict=False)
+        # also load the dataset-specific head if present
+        fc_dict = ck.get('fc_layers', {})
+        if ds in fc_dict:
+            t.classifier[1].load_state_dict(fc_dict[ds], strict=False)
+    else:
+        # assume ck *is* a bare state_dict
+        t.load_state_dict(ck, strict=False)
+
     return t.eval().to(DEVICE)
 
 # ─── DISTILL LOSS ──────────────────────────────────────────────────────────────────
