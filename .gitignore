@@ -1,0 +1,16 @@
+# Ignore data folder
+data/
+
+# Ignore Python cache
+src/__pycache__/
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings (if applicable)
+.vscode/

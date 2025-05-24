@@ -1,0 +1,26 @@
+# Global config for MedMNIST-EdgeAI
+
+project:
+  name: MedMNIST-EdgeAI
+  seed: 42
+
+data:
+  dir: data
+  dataset: pathmnist     # can be changed to chestmnist, dermamnist, etc.
+  image_size: 28
+  batch_size: 64
+  num_workers: 2
+
+model:
+  arch: mobilenetv3
+  num_classes: 9          # pathmnist = 9, adjust based on dataset
+
+train:
+  epochs: 20
+  lr: 0.001
+  weight_decay: 0.0001
+  optimizer: adam
+
+log:
+  interval: 10
+  save_dir: outputs/
