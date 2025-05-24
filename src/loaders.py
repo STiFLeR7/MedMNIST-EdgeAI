@@ -1,7 +1,7 @@
 import os
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from dataloader import MedMNISTDataset
+from src.dataloader import MedMNISTDataset
 import numpy as np
 
 def get_dataloaders(data_dir, dataset_name, batch_size=64, image_size=28, num_workers=2):
