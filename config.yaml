@@ -5,22 +5,25 @@ project:
   seed: 42
 
 data:
-  dir: data
-  dataset: pathmnist     # can be changed to chestmnist, dermamnist, etc.
-  image_size: 28
+  dir: data                        # Root data directory
+  dataset: pathmnist              # Options: pathmnist, chestmnist, dermamnist, etc.
+  image_size: 28                  # All MedMNIST images are 28x28
   batch_size: 64
   num_workers: 2
 
 model:
-  arch: mobilenetv3
-  num_classes: 9          # pathmnist = 9, adjust based on dataset
+  teacher_arch: resnet50          # Teacher model architecture
+  student_arch: mobilenetv3       # Future student model (for distillation)
+  pretrained: true
+  dynamic_fc: true                # Enable automatic fc adaptation to class count
 
 train:
   epochs: 20
   lr: 0.001
   weight_decay: 0.0001
-  optimizer: adam
+  optimizer: adam                 # Options: adam, sgd
 
 log:
   interval: 10
-  save_dir: outputs/
+  save_dir: models/               # Checkpoints, saved weights
+  log_dir: logs/                  # (Optional) TensorBoard/W&B
