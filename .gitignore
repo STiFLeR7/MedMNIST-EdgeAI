@@ -1,6 +1,10 @@
 # Ignore data folder
 data/
 
+# Ignore logs
+logs/
+# Ignore models
+models/
 # Ignore Python cache
 src/__pycache__/
 
@@ -14,5 +18,3 @@ src/__pycache__/
 
 # VSCode settings (if applicable)
 .vscode/
-
-models/
