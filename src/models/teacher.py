@@ -3,22 +3,30 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 import os
+import sys
 from tqdm import tqdm
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from src.loaders import get_dataloaders
 from utils.config import load_config
-
+import numpy as np
 
 class TeacherResNet50(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, weights_path=None):
         super(TeacherResNet50, self).__init__()
-        self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        self.model = models.resnet50(weights=None)  # prevent downloading
+        if weights_path and os.path.isfile(weights_path):
+            print(f"🔍 Loading local weights from {weights_path}")
+            state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+            self.model.load_state_dict(state_dict)
+        else:
+            raise FileNotFoundError(f"❌ Local ResNet50 weights not found at: {weights_path}")
+
+        # Replace final FC layer
         in_features = self.model.fc.in_features
         self.model.fc = nn.Linear(in_features, num_classes)
 
     def forward(self, x):
         return self.model(x)
-
 
 def train_teacher():
     # Load config
@@ -36,16 +44,20 @@ def train_teacher():
     save_dir = cfg['log']['save_dir']
     os.makedirs(save_dir, exist_ok=True)
 
+    # Path to local ResNet-50 pretrained weights
+    weights_path = os.path.join("models", "resnet50", "resnet50.pth")
+
     # Load Data
     train_loader, val_loader, _ = get_dataloaders(data_dir, dataset, batch_size, image_size, num_workers)
-    num_classes = len(train_loader.dataset.class_names)
+    labels = [label for _, label in train_loader.dataset]
+    unique_labels = np.unique(labels)
+    num_classes = len(unique_labels)
 
-    # Init model
-    model = TeacherResNet50(num_classes).cuda()
+    # Init model with local weights
+    model = TeacherResNet50(num_classes, weights_path).cuda()
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
-
     if optimizer_choice.lower() == "adam":
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     elif optimizer_choice.lower() == "sgd":
@@ -95,3 +107,6 @@ def train_teacher():
             print(f"✅ Best model saved at {best_model_path} with Val Acc: {val_acc:.4f}")
 
     print(f"🏁 Training complete. Highest Val Acc: {best_acc:.4f}")
+
+if __name__ == "__main__":
+    train_teacher()
