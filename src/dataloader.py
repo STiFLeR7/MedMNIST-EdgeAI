@@ -15,7 +15,8 @@ class MedMNISTDataset(Dataset):
     def __getitem__(self, index):
         image, label = self.images[index], self.labels[index]
 
-        label = int(label)  # <- 🔥 FIX HERE
+        # Ensure label is returned as tensor (multi-label or scalar)
+        label = torch.tensor(label, dtype=torch.float32 if len(label) > 1 else torch.long)  # <- 🔥 FIX HERE
 
         image = image.astype(np.uint8)
         if image.ndim == 2:

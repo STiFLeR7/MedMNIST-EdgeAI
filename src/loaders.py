@@ -31,7 +31,7 @@ def get_dataloaders(data_dir, dataset_name, batch_size=64, image_size=28, num_wo
     test_dataset  = MedMNISTDataset(data_path, split='test', transform=transform)
 
     # Dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,  num_workers=num_workers)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
     val_loader   = DataLoader(val_dataset,   batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader  = DataLoader(test_dataset,  batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
