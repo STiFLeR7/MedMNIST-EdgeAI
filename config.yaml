@@ -6,7 +6,7 @@ project:
 
 data:
   dir: data                        # Root data directory
-  dataset: octmnist              # Options: pathmnist, chestmnist, dermamnist, etc.
+  dataset: chestmnist             # Options: pathmnist, chestmnist, dermamnist, etc.
   image_size: 28                  # All MedMNIST images are 28x28
   batch_size: 64
   num_workers: 0
