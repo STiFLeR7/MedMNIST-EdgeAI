@@ -9,6 +9,15 @@
 * ✅ Baseline training pipeline using CNNs and basic augmentation techniques.
 * ✅ Logging setup for clean experiment tracking.
 * ✅ `.gitignore` configured to exclude data and Python caches.
+* ✅ **Teacher model training complete** for 5 MedMNIST datasets:
+
+| Dataset     | Metric   | Score  |
+| ----------- | -------- | ------ |
+| PathMNIST   | Accuracy | \~0.90 |
+| ChestMNIST  | AUROC    | \~0.75 |
+| OrganAMNIST | Accuracy | \~0.98 |
+| DermaMNIST  | Accuracy | \~0.73 |
+| OCTMNIST    | Accuracy | \~0.92 |
 
 ## 🚧 Under Development
 
