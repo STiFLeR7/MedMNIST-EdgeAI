@@ -15,17 +15,22 @@ class MedMNISTDataset(Dataset):
     def __getitem__(self, index):
         image, label = self.images[index], self.labels[index]
 
-        # Ensure label is returned as tensor (multi-label or scalar)
-        label = torch.tensor(label, dtype=torch.long).squeeze() # <- 🔥 FIX HERE
+        if isinstance(image, torch.Tensor):
+            image = image.numpy()
 
-        image = image.astype(np.uint8)
         if image.ndim == 2:
-            image = Image.fromarray(image, mode='L')
+            image = Image.fromarray(image.astype(np.uint8), mode='L')
         else:
-            image = Image.fromarray(image)
+            image = Image.fromarray(image.astype(np.uint8))
 
         if self.transform:
             image = self.transform(image)
+
+        label = torch.tensor(label)
+        if label.ndim > 0 and label.numel() > 1:
+            label = label.float()  # multi-label
+        else:
+            label = label.long().squeeze()  # single-label
 
         return image, label
 
