@@ -11,16 +11,11 @@ from sklearn.metrics import roc_auc_score
 import numpy as np
 
 class TeacherResNet50(nn.Module):
-    def __init__(self, num_classes, weights_path="models/resnet50/resnet50.pth"):
+    def __init__(self, num_classes):
         super(TeacherResNet50, self).__init__()
         self.model = models.resnet50(weights=None)
-        if os.path.isfile(weights_path):
-            print(f"🔍 Loading local ResNet50 weights from {weights_path}")
-            state_dict = torch.load(weights_path, map_location='cpu')
-            self.model.load_state_dict(state_dict)
-        else:
-            raise FileNotFoundError(f"ResNet50 weights not found at {weights_path}")
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+        in_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(in_features, num_classes)
 
     def forward(self, x):
         return self.model(x)
