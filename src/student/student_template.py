@@ -1,100 +1,90 @@
-import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from tqdm import tqdm
-from src.loaders import get_dataloaders
+import os
 from src.models.teacher_template import TeacherResNet50
+from src.loaders import get_dataloaders
+import torch.nn.functional as F
 
-
-def get_student_model(model_name, num_classes):
-    if model_name == "resnet18":
+def get_student_model(student_name, num_classes):
+    if student_name == "resnet18":
         model = models.resnet18(weights=None)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
-    elif model_name == "mobilenet_v2":
+    elif student_name == "mobilenet_v2":
         model = models.mobilenet_v2(weights=None)
         model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-    elif model_name == "efficientnet_b0":
+    elif student_name == "efficientnet_b0":
         model = models.efficientnet_b0(weights=None)
         model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
     else:
-        raise ValueError(f"Unsupported student model: {model_name}")
-
+        raise ValueError(f"Unknown student model: {student_name}")
     return model
 
-
-def distill_student(dataset, student_name, num_classes, teacher_path, student_ckpt_path, epochs=20, alpha=0.5, temperature=4.0):
+def distill_student(dataset, student_name, num_classes, teacher_path, student_ckpt_path):
     print(f"\n📚 Distilling knowledge to {student_name} on {dataset.upper()}...")
 
-    # Load Dataloaders
-    data_dir = "data"
-    batch_size = 64
-    image_size = 28
-    num_workers = 0
-    train_loader, val_loader, _ = get_dataloaders(data_dir, dataset, batch_size, image_size, num_workers)
+    # Data
+    train_loader, val_loader, _ = get_dataloaders("data", dataset, batch_size=64, image_size=28, num_workers=2)
 
-    # Load teacher
-    teacher = TeacherResNet50(num_classes)
+    # Teacher model
+    teacher = TeacherResNet50(num_classes).cuda()
     teacher.load_state_dict(torch.load(teacher_path, map_location="cuda"))
-    teacher.cuda().eval()
+    teacher.eval()
 
-    # Load student
-    student = get_student_model(student_name, num_classes)
-    student.load_state_dict(torch.load(f"models/{student_name}/{student_name}.pth", map_location="cpu"), strict=False)
-    student.cuda()
+    # Student model
+    student = get_student_model(student_name, num_classes).cuda()
+    pretrained_path = f"models/{student_name}/{student_name}.pth"
 
-    # Loss functions
+    if os.path.exists(pretrained_path):
+        print(f"🔄 Loading base weights for {student_name} from {pretrained_path}")
+        state_dict = torch.load(pretrained_path, map_location='cpu')
+
+        # Remove classifier/fc layers
+        filtered_state_dict = {
+            k: v for k, v in state_dict.items()
+            if not k.startswith("fc.") and not k.startswith("classifier.")
+        }
+
+        missing, unexpected = student.load_state_dict(filtered_state_dict, strict=False)
+        print(f"ℹ️ Loaded base weights with missing keys: {missing}")
+    else:
+        print(f"⚠️ No base weights found for {student_name}, training from scratch.")
+
+    # Losses and optimizer
     criterion_ce = nn.CrossEntropyLoss()
     criterion_kd = nn.KLDivLoss(reduction='batchmean')
+    optimizer = optim.Adam(student.parameters(), lr=1e-3)
 
-    optimizer = optim.Adam(student.parameters(), lr=1e-3, weight_decay=1e-4)
-
-    best_acc = 0
+    # Training loop
+    epochs = 10
     for epoch in range(epochs):
         student.train()
-        total_loss = 0
-
+        running_loss = 0.0
         for images, labels in tqdm(train_loader, desc=f"[Epoch {epoch+1}/{epochs}]"):
             images, labels = images.cuda(), labels.cuda()
+
             with torch.no_grad():
                 teacher_outputs = teacher(images)
 
             student_outputs = student(images)
 
-            loss_kd = criterion_kd(
-                nn.functional.log_softmax(student_outputs / temperature, dim=1),
-                nn.functional.softmax(teacher_outputs / temperature, dim=1)
-            ) * (temperature ** 2)
-
             loss_ce = criterion_ce(student_outputs, labels)
-            loss = alpha * loss_kd + (1 - alpha) * loss_ce
+            loss_kd = criterion_kd(
+                F.log_softmax(student_outputs / 4.0, dim=1),
+                F.softmax(teacher_outputs / 4.0, dim=1)
+            ) * (4.0 ** 2)
+
+            loss = 0.5 * loss_ce + 0.5 * loss_kd
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            running_loss += loss.item()
 
-            total_loss += loss.item()
+        print(f"✅ Epoch {epoch+1}: Avg Loss = {running_loss / len(train_loader):.4f}")
 
-        avg_loss = total_loss / len(train_loader)
-
-        # Evaluate
-        student.eval()
-        correct, total = 0, 0
-        with torch.no_grad():
-            for images, labels in val_loader:
-                images, labels = images.cuda(), labels.cuda()
-                outputs = student(images)
-                _, preds = torch.max(outputs, 1)
-                correct += (preds == labels).sum().item()
-                total += labels.size(0)
-
-        val_acc = correct / total
-        print(f"Epoch {epoch+1}: Loss={avg_loss:.4f} | Val Acc={val_acc:.4f}")
-
-        if val_acc > best_acc:
-            best_acc = val_acc
-            torch.save(student.state_dict(), student_ckpt_path)
-            print(f"✅ Best model saved to {student_ckpt_path}")
-
-    print(f"🏁 Finished distillation for {student_name} on {dataset}. Best Val Acc: {best_acc:.4f}")
+    # Save final student checkpoint
+    torch.save(student.state_dict(), student_ckpt_path)
+    print(f"💾 Saved student model to {student_ckpt_path}")
