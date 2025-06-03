@@ -88,3 +88,10 @@ def distill_student(dataset, student_name, num_classes, teacher_path, student_ck
     # Save final student checkpoint
     torch.save(student.state_dict(), student_ckpt_path)
     print(f"💾 Saved student model to {student_ckpt_path}")
+
+def run_distillation(dataset, student_name, num_classes, teacher_path, student_ckpt_path):
+    distill_student(dataset, student_name, num_classes, teacher_path, student_ckpt_path)
+
+if __name__ == "__main__":
+    from train_path_student import distill_student  # only if you want to call it directly here (optional)
+    pass  # nothing to do if you're calling from train_path_student.py
