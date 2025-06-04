@@ -42,20 +42,20 @@ def evaluate_student(model, val_loader):
 
 
 if __name__ == "__main__":
-    dataset = "pathmnist"
-    num_classes = 9
+    dataset = "octmnist"
+    num_classes = 4
     data_dir = "data"
 
     # Load val loader only
     _, val_loader, _ = get_dataloaders(data_dir, dataset, batch_size=64, image_size=28, num_workers=2)
 
     student_models = {
-        "resnet18": f"models/resnet18/resnet18_pathmnist_student.pth",
-        "mobilenet_v2": f"models/mobilenet_v2/mobilenet_v2_pathmnist_student.pth",
-        "efficientnet_b0": f"models/efficientnet_b0/efficientnet_b0_pathmnist_student.pth"
+        "resnet18": f"models/resnet18/resnet18_octmnist_student.pth",
+        "mobilenet_v2": f"models/mobilenet_v2/mobilenet_v2_octmnist_student.pth",
+        "efficientnet_b0": f"models/efficientnet_b0/efficientnet_b0_octmnist_student.pth"
     }
 
-    print("📊 Student Model Evaluation on PathMNIST\n")
+    print("📊 Student Model Evaluation on OCTMNIST\n")
 
     for name, path in student_models.items():
         if not os.path.exists(path):
