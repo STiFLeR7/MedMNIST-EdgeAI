@@ -9,15 +9,59 @@
 * ✅ Baseline training pipeline using CNNs and basic augmentation techniques.
 * ✅ Logging setup for clean experiment tracking.
 * ✅ `.gitignore` configured to exclude data and Python caches.
-* ✅ **Teacher model training complete** for 5 MedMNIST datasets:
+* ✅ **Teacher and student model validation complete** for 5 MedMNIST datasets.
 
-| Dataset     | Metric   | Score  |
-| ----------- | -------- | ------ |
-| PathMNIST   | Accuracy | \~0.90 |
-| ChestMNIST  | AUROC    | \~0.75 |
-| OrganAMNIST | Accuracy | \~0.98 |
-| DermaMNIST  | Accuracy | \~0.73 |
-| OCTMNIST    | Accuracy | \~0.92 |
+### 🧠 Validation Accuracy (Teacher: ResNet50)
+
+| Dataset     | Metric   | Score |
+| ----------- | -------- | ----- |
+| PathMNIST   | Accuracy | 0.90  |
+| DermaMNIST  | Accuracy | 0.73  |
+| OCTMNIST    | Accuracy | 0.92  |
+| OrganAMNIST | Accuracy | 0.98  |
+| ChestMNIST  | AUROC    | 0.75  |
+
+### 🎓 Student Model Performance
+
+#### PathMNIST
+
+| Model           | Accuracy |
+| --------------- | -------- |
+| ResNet18        | 0.8798   |
+| MobileNetV2     | 0.8764   |
+| EfficientNet-B0 | 0.8880   |
+
+#### OCTMNIST
+
+| Model           | Accuracy |
+| --------------- | -------- |
+| ResNet18        | 0.9215   |
+| MobileNetV2     | 0.9096   |
+| EfficientNet-B0 | 0.8857   |
+
+#### OrganAMNIST
+
+| Model           | Accuracy |
+| --------------- | -------- |
+| ResNet18        | 0.9754   |
+| MobileNetV2     | 0.9672   |
+| EfficientNet-B0 | 0.9687   |
+
+#### ChestMNIST (AUROC)
+
+| Model           | AUROC  |
+| --------------- | ------ |
+| ResNet18        | 0.6926 |
+| MobileNetV2     | 0.6692 |
+| EfficientNet-B0 | 0.6706 |
+
+#### DermaMNIST
+
+| Model           | Accuracy |
+| --------------- | -------- |
+| ResNet18        | 0.6949   |
+| MobileNetV2     | 0.7019   |
+| EfficientNet-B0 | 0.6929   |
 
 ## 🚧 Under Development
 
