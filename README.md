@@ -92,16 +92,27 @@
 
 ```bash
 MedMNIST-EdgeAI/
-├── src/                  # All source code
-│   ├── data/             # Data loading and preprocessing
-│   ├── models/           # Model definitions
-│   ├── train.py          # Training pipeline
-│   ├── evaluate.py       # Evaluation script
-│   └── utils.py          # Utility functions
-├── data/                 # (gitignored) Raw and processed data
-├── experiments/          # Saved models, logs, checkpoints
-├── README.md             # This file
-└── requirements.txt      # Environment dependencies
+├── data/                           # Raw and processed data (gitignored)
+├── models/                         # Saved model weights (if any)
+├── src/                            # All source code
+│   ├── models/                     # Teacher and student model definitions
+│   │   ├── evaluate_all_teachers.py
+│   │   ├── evaluate_chest_teacher.py
+│   │   ├── teacher_*.py            # Teacher models for each dataset
+│   │   └── student/                # Student model training and evaluation
+│   │       ├── train_*.py
+│   │       ├── student_eval*.py
+│   │       └── student_template.py
+│   ├── utils/                      # Configs and shared utilities
+│   │   └── config.py
+│   ├── loaders.py                  # Dataset loaders
+│   └── dataloader.py              # MedMNIST-specific loading
+├── download_data.py               # Data download script
+├── download_model.py              # Teacher model download script
+├── download_student_models.py     # Student model download script
+├── .gitignore
+├── README.md                      # This file
+└── requirements.txt               # Environment dependencies
 ```
 
 ## 🧪 How to Run
@@ -110,11 +121,17 @@ MedMNIST-EdgeAI/
 # Install dependencies
 pip install -r requirements.txt
 
-# Train model
-python src/train.py --dataset pathoMNIST --epochs 20
+# Train teacher model (example)
+python src/models/train_path_teacher.py --epochs 20
 
-# Evaluate model
-python src/evaluate.py --model checkpoints/best_model.pth
+# Evaluate teacher model
+python src/models/evaluate_all_teachers.py
+
+# Train student model (example)
+python src/models/student/train_path_student.py --epochs 20
+
+# Evaluate student model
+python src/models/student/student_eval.py
 ```
 
 ## 🤝 Contributors
