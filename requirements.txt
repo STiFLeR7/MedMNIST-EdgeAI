@@ -1,0 +1,23 @@
+# Core Python
+numpy==1.24.4
+pandas==2.2.1
+matplotlib==3.7.5
+seaborn==0.13.2
+
+# PyTorch & TorchVision
+torch==2.1.2
+torchvision==0.16.2
+
+# MedMNIST Dataset API
+medmnist==2.2.2
+
+# Progress bar (optional but useful)
+tqdm==4.66.2
+
+# Logging (optional if using WandB)
+wandb==0.16.6
+
+# For type hinting, linting, and formatting (optional dev tools)
+black==24.4.2
+flake8==7.0.0
+isort==5.13.2
