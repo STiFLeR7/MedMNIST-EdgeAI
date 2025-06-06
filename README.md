@@ -25,11 +25,11 @@
 
 #### PathMNIST
 
-| Model           | Accuracy |
-| --------------- | -------- |
-| ResNet18        | 0.8798   |
-| MobileNetV2     | 0.8764   |
-| EfficientNet-B0 | 0.8880   |
+| Model           | Accuracy | Params (M) | Reduction (%) | Perf. Retained (%) |
+| --------------- | -------- | ---------- | ------------- | ------------------ |
+| ResNet18        | 0.8798   | 11.7       | 54.40         | 97.63              |
+| MobileNetV2     | 0.8764   | 4.5        | 86.09         | 97.25              |
+| EfficientNet-B0 | 0.8880   | 5.5        | 79.14         | 98.54              |
 
 #### OCTMNIST
 
@@ -94,23 +94,36 @@
 MedMNIST-EdgeAI/
 ├── data/                           # Raw and processed data (gitignored)
 ├── models/                         # Saved model weights (if any)
+├── outputs/                        # Performance charts/graphs and logs
 ├── src/                            # All source code
 │   ├── models/                     # Teacher and student model definitions
 │   │   ├── evaluate_all_teachers.py
 │   │   ├── evaluate_chest_teacher.py
-│   │   ├── teacher_*.py            # Teacher models for each dataset
+│   │   ├── teacher_chest.py
+│   │   ├── teacher_derma.py
+│   │   ├── teacher_oct.py
+│   │   ├── teacher_organ.py
+│   │   ├── teacher_path.py
+│   │   ├── teacher_template.py
+│   │   ├── performance/            # Performance vs size visualization
 │   │   └── student/                # Student model training and evaluation
-│   │       ├── train_*.py
-│   │       ├── student_eval*.py
+│   │       ├── train_chest_student.py
+│   │       ├── train_derma_student.py
+│   │       ├── train_oct_student.py
+│   │       ├── train_organ_student.py
+│   │       ├── train_path_student.py
+│   │       ├── student_eval.py
+│   │       ├── student_eval_chest.py
 │   │       └── student_template.py
 │   ├── utils/                      # Configs and shared utilities
 │   │   └── config.py
-│   ├── loaders.py                  # Dataset loaders
-│   └── dataloader.py              # MedMNIST-specific loading
+│   ├── dataloader.py              # MedMNIST-specific loading
+│   └── loaders.py                 # Dataset loaders
 ├── download_data.py               # Data download script
 ├── download_model.py              # Teacher model download script
 ├── download_student_models.py     # Student model download script
 ├── .gitignore
+├── MedMNIST.docx                  # Optional documentation
 ├── README.md                      # This file
 └── requirements.txt               # Environment dependencies
 ```
