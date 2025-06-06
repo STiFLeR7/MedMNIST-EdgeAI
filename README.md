@@ -1,17 +1,35 @@
 # MedMNIST-EdgeAI 🚑⚡
 
-**MedMNIST-EdgeAI** is an edge-optimized deep learning pipeline focused on medical image classification using the [MedMNIST](https://medmnist.com/) dataset collection. This project emphasizes real-time performance, low-latency inference, and efficient deployment on resource-constrained devices, including mobile GPUs and edge accelerators.
+**MedMNIST-EdgeAI** is a lightweight yet powerful research pipeline built for real-time medical image analysis on edge devices. Leveraging the [MedMNIST](https://medmnist.com/) dataset suite, this project optimizes deep learning pipelines for low-power GPUs and edge accelerators, making it ideal for embedded healthcare AI systems.
 
-## 📌 Current Scope (v0.1)
+---
 
-* ✅ Standardized project structure for scalability and modularity.
-* ✅ Integration of MedMNIST datasets using `medmnist` library.
-* ✅ Baseline training pipeline using CNNs and basic augmentation techniques.
-* ✅ Logging setup for clean experiment tracking.
-* ✅ `.gitignore` configured to exclude data and Python caches.
-* ✅ **Teacher and student model validation complete** for 5 MedMNIST datasets.
+## 🚀 Strategic Overview
 
-### 🧠 Validation Accuracy (Teacher: ResNet50)
+🔍 **Objective**: Democratize medical AI by optimizing classification models for constrained environments without compromising diagnostic accuracy.
+
+🎯 **Impact Goals**:
+
+* Enable real-time diagnostics at the edge
+* Shrink model size without significant accuracy loss (via Knowledge Distillation)
+* Advance research at the intersection of Edge Computing + Healthcare AI
+* Promote reproducibility and modular extensibility for researchers
+
+---
+
+## 📈 Current Scope (v0.1)
+
+* ✅ Standardized, research-ready project structure
+* ✅ Teacher model training on 5 MedMNIST datasets using ResNet50
+* ✅ Student model distillation using ResNet18, MobileNetV2, EfficientNet-B0
+* ✅ Integrated evaluation and performance logging
+* ✅ Accuracy and AUROC benchmarking with performance vs size trade-off charts
+
+---
+
+## 📊 Model Performance Snapshot
+
+### 🧠 Teacher Models (ResNet50)
 
 | Dataset     | Metric   | Score |
 | ----------- | -------- | ----- |
@@ -21,15 +39,15 @@
 | OrganAMNIST | Accuracy | 0.98  |
 | ChestMNIST  | AUROC    | 0.75  |
 
-### 🎓 Student Model Performance
+### 🎓 Student Model Comparison
 
-#### PathMNIST
+#### 📌 PathMNIST
 
-| Model           | Accuracy | Params (M) | Reduction (%) | Perf. Retained (%) |
-| --------------- | -------- | ---------- | ------------- | ------------------ |
-| ResNet18        | 0.8798   | 11.7       | 54.40         | 97.63              |
-| MobileNetV2     | 0.8764   | 4.5        | 86.09         | 97.25              |
-| EfficientNet-B0 | 0.8880   | 5.5        | 79.14         | 98.54              |
+| Model           | Accuracy | Params (M) | Reduction (%) | Retained (%) |
+| --------------- | -------- | ---------- | ------------- | ------------ |
+| ResNet18        | 0.8798   | 11.7       | 54.40         | 97.63        |
+| MobileNetV2     | 0.8764   | 4.5        | 86.09         | 97.25        |
+| EfficientNet-B0 | 0.8880   | 5.5        | 79.14         | 98.54        |
 
 #### OCTMNIST
 
@@ -63,95 +81,94 @@
 | MobileNetV2     | 0.7019   |
 | EfficientNet-B0 | 0.6929   |
 
-## 🚧 Under Development
+---
 
-* ⏳ Custom model experimentation (e.g., MobileNetV3, EfficientNet-lite, etc.).
-* ⏳ Torch quantization pipeline (static/dynamic).
-* ⏳ ONNX/TensorRT conversion for inference benchmarking.
-* ⏳ Benchmarking on RTX 3050 vs. Jetson/Edge TPU.
-
-## 🔮 Future Roadmap
-
-* 🧠 Edge LLM integration for real-time decision support (Doctor AI Assistant).
-* 🚁 Federated learning pipeline for privacy-preserving medical AI.
-* 📲 Android/iOS inference app for real-time diagnostics.
-* 📊 Integrated visual dashboard for predictions, ROC, confusion matrix, and misclassification analysis.
-* 🤝 Collaboration with healthcare domain experts for use-case validation.
-
-## 🧱 Tech Stack
+## 🔧 Tech Stack
 
 * Python 3.10+
 * PyTorch
-* MedMNIST
 * TorchVision
-* NumPy, Matplotlib, Seaborn
+* MedMNIST
 * ONNX / TensorRT (planned)
+* NumPy, Matplotlib, Seaborn
 * WandB (optional logging)
 
-## 📂 Project Structure
+---
+
+## 🏗️ Project Structure
 
 ```bash
 MedMNIST-EdgeAI/
 ├── data/                           # Raw and processed data (gitignored)
-├── models/                         # Saved model weights (if any)
-├── outputs/                        # Performance charts/graphs and logs
-├── src/                            # All source code
-│   ├── models/                     # Teacher and student model definitions
+├── models/                         # Saved weights and experiments
+├── outputs/                        # Performance graphs & evaluation results
+├── src/                            # Core source code
+│   ├── models/                     # Teacher and student models
 │   │   ├── evaluate_all_teachers.py
 │   │   ├── evaluate_chest_teacher.py
-│   │   ├── teacher_chest.py
-│   │   ├── teacher_derma.py
-│   │   ├── teacher_oct.py
-│   │   ├── teacher_organ.py
-│   │   ├── teacher_path.py
-│   │   ├── teacher_template.py
-│   │   ├── performance/            # Performance vs size visualization
-│   │   └── student/                # Student model training and evaluation
-│   │       ├── train_chest_student.py
-│   │       ├── train_derma_student.py
-│   │       ├── train_oct_student.py
-│   │       ├── train_organ_student.py
-│   │       ├── train_path_student.py
+│   │   ├── teacher_chest.py, etc.
+│   │   ├── performance/            # Performance vs size charting
+│   │   └── student/                # Distillation and student training
+│   │       ├── train_path_student.py, etc.
 │   │       ├── student_eval.py
-│   │       ├── student_eval_chest.py
-│   │       └── student_template.py
-│   ├── utils/                      # Configs and shared utilities
+│   ├── utils/                      # Utility configs and tools
 │   │   └── config.py
-│   ├── dataloader.py              # MedMNIST-specific loading
-│   └── loaders.py                 # Dataset loaders
-├── download_data.py               # Data download script
-├── download_model.py              # Teacher model download script
-├── download_student_models.py     # Student model download script
-├── .gitignore
-├── MedMNIST.docx                  # Optional documentation
-├── README.md                      # This file
-└── requirements.txt               # Environment dependencies
+│   ├── dataloader.py              # MedMNIST integration
+│   └── loaders.py                 # Dataset loading wrappers
+├── download_data.py
+├── download_model.py
+├── download_student_models.py
+├── requirements.txt
+├── README.md
+└── .gitignore
 ```
 
-## 🧪 How to Run
+---
+
+## 🧪 Quick Start
 
 ```bash
-# Install dependencies
+# Install all dependencies
 pip install -r requirements.txt
 
-# Train teacher model (example)
+# Train a teacher model (example)
 python src/models/train_path_teacher.py --epochs 20
 
-# Evaluate teacher model
+# Evaluate all teacher models
 python src/models/evaluate_all_teachers.py
 
 # Train student model (example)
 python src/models/student/train_path_student.py --epochs 20
 
-# Evaluate student model
+# Evaluate student models
 python src/models/student/student_eval.py
 ```
 
+---
+
+## 🚧 Upcoming Milestones
+
+* 🔲 PyTorch static/dynamic quantization
+* 🔲 ONNX export and TensorRT runtime
+* 🔲 Jetson Nano & Edge TPU benchmarks
+* 🔲 Visual dashboards (ROC, CM, Grad-CAM, etc.)
+* 🔲 Android/iOS deployment (TFLite or CoreML)
+* 🔲 Edge-LLM integration for clinical support
+
+---
+
 ## 🤝 Contributors
 
-* **Stifler** – Researcher & Developer @ NIMS | AI/ML/DL | CudaBit Tech Lead
-* Open to contributions! If you're passionate about AI + Healthcare + Edge, ping me.
+* **Stifler** – AI/ML/DL | Edge AI Researcher @ NIMS | CEO, CudaBit
+
+Open to contributors! Fork the repo, raise issues or PRs. Let’s push EdgeAI in healthcare to the next level.
+
+---
 
 ## 📜 License
 
-This project is licensed under the MIT License. See `LICENSE` for more details.
+This project is licensed under the **MIT License**.
+
+---
+
+> ⭐️ Star the repo if you find this useful, and follow [Stifler](https://github.com/STiFLeR7) for more edge-optimized research projects.
